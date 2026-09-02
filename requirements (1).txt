@@ -1,0 +1,6 @@
+pyTelegramBotAPI
+python-socketio
+requests
+Flask
+urllib3
+websocket-client
