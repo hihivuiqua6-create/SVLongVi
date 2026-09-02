@@ -903,8 +903,7 @@ def start_websocket(chat_id, token):
         tb = ''
         if hist_data:
             st['history'] = hist_data
-            tb = f"
-║ 📥 LỊCH SỬ THU THẬP: <b>{len(hist_data)}</b> PHIÊN ✅"
+            tb = f"║ 📥 LỊCH SỬ THU THẬP: <b>{len(hist_data)}</b> PHIÊN ✅"
         else:
             tb = "
 ║ ⚠️ Thu thập tự động realtime"
