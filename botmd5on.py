@@ -903,11 +903,9 @@ def start_websocket(chat_id, token):
         tb = ''
         if hist_data:
             st['history'] = hist_data
-            tb = f"
-║ 📥 LỊCH SỬ THU THẬP: <b>{len(hist_data)}</b> PHIÊN ✅"
+            tb = f"\n║ 📥 LỊCH SỬ THU THẬP: <b>{len(hist_data)}</b> PHIÊN ✅"
         else:
-            tb = "
-║ ⚠️ Thu thập tự động realtime"
+            tb = "\n║ ⚠️ Thu thập tự động realtime"
             
         msg = f"""<pre>╔════════════════════════════════════════════╗
 ║     🟢 KẾT NỐI MÁY CHỦ THÀNH CÔNG 🟢       ║
@@ -965,14 +963,11 @@ def start_websocket(chat_id, token):
 
         if st['auto_bet_enabled']:
             if dt >= MIN_CONFIDENCE_AUTO_BET:
-                msg += f"
-<pre>║ ⚡ AUTO CƯỢC: {st['bet_amount']:,} WIN (READY)</pre>"
+                msg += f"\n<pre>║ ⚡ AUTO CƯỢC: {st['bet_amount']:,} WIN (READY)</pre>"
             else:
-                msg += f"
-<pre>║ ⚠️ ĐỘ TIN CẬY <{MIN_CONFIDENCE_AUTO_BET}% → BỎ QUA</pre>"
+                msg += f"\n<pre>║ ⚠️ ĐỘ TIN CẬY <{MIN_CONFIDENCE_AUTO_BET}% → BỎ QUA</pre>"
             
-        msg += "
-<pre>╚════════════════════════════════════════════╝</pre>"
+        msg += "\n<pre>╚════════════════════════════════════════════╝</pre>"
         try: bot.send_message(chat_id, msg, parse_mode='HTML')
         except: pass
 
@@ -1053,16 +1048,12 @@ def start_websocket(chat_id, token):
             ok = (norm_pred == kq)
             x2_text = "(X2 PHIÊN SAU)" if (st.get('x2_enabled') and not ok) else ""
             text_kq = f"🟢 ĐÚNG ✅ WIN STREAM: {st['win_streak']}" if ok else f"🔴 SAI ⚠️ LOSE STREAM: {st['lose_streak']} {x2_text}"
-            row += f"
-<pre>║ 📊 ĐÁNH GIÁ: {text_kq}
-║ 📈 TỔNG LÃI/LỖ THU THẬP: {pl_str}</pre>"
+            row += f"\n<pre>║ 📊 ĐÁNH GIÁ: {text_kq}\n║ 📈 TỔNG LÃI/LỖ THU THẬP: {pl_str}</pre>"
             st['waiting_for_result'] = False
             
         recent_res = getResults(st['history'], 14)
         ls = "".join(['🔵' if x == 'TÀI' else '🔴' for x in recent_res])
-        row += f"
-<pre>║ 📜 LỊCH SỬ CẦU: {ls}</pre>
-<pre>╚════════════════════════════════════════════╝</pre>"
+        row += f"\n<pre>║ 📜 LỊCH SỬ CẦU: {ls}</pre>\n<pre>╚════════════════════════════════════════════╝</pre>"
         try: bot.send_message(chat_id, row, parse_mode='HTML')
         except: pass
 
@@ -1133,19 +1124,16 @@ def send_x2_toggle(message):
     parts = message.text.split()
     if len(parts) < 2:
         status = "💥 BẬT" if st.get('x2_enabled') else "🔴 TẮT"
-        return bot.reply_to(message, f"✅ Trạng thái Gấp thếp X2 hiện tại: <b>{status}</b>
-👉 Dùng <code>/x2 on</code> để bật hoặc <code>/x2 off</code> để tắt.")
+        return bot.reply_to(message, f"✅ Trạng thái Gấp thếp X2 hiện tại: <b>{status}</b>\n👉 Dùng <code>/x2 on</code> để bật hoặc <code>/x2 off</code> để tắt.")
     
     cmd = parts[1].lower()
     if cmd == 'on':
         st['x2_enabled'] = True
-        bot.reply_to(message, "💥 <b>ĐÃ BẬT CHẾ ĐỘ GẤP THẾP X2!</b>
-Khi cược thua, hệ thống sẽ tự động nhân đôi tiền cược ở phiên tiếp theo.")
+        bot.reply_to(message, "💥 <b>ĐÃ BẬT CHẾ ĐỘ GẤP THẾP X2!</b>\nKhi cược thua, hệ thống sẽ tự động nhân đôi tiền cược ở phiên tiếp theo.")
     elif cmd == 'off':
         st['x2_enabled'] = False
         st['bet_amount'] = st['base_bet']
-        bot.reply_to(message, "🔴 <b>ĐÃ TẮT CHẾ ĐỘ GẤP THẾP X2!</b>
-Hệ thống sẽ giữ nguyên tiền cược cố định ngay cả khi thua.")
+        bot.reply_to(message, "🔴 <b>ĐÃ TẮT CHẾ ĐỘ GẤP THẾP X2!</b>\nHệ thống sẽ giữ nguyên tiền cược cố định ngay cả khi thua.")
     else:
         bot.reply_to(message, "✅ Cú pháp: <code>/x2 on</code> hoặc <code>/x2 off</code>")
 
@@ -1159,8 +1147,7 @@ def send_tudong_chiavon(message):
     st = user_states[cid]
     parts = message.text.split()
     if len(parts) < 2 or not parts[1].isdigit():
-        return bot.reply_to(message, "✅ Cú pháp chia vốn tự động: <code>/tudong [SỐ_VỐN]</code>
-Ví dụ: <code>/tudong 40000</code>")
+        return bot.reply_to(message, "✅ Cú pháp chia vốn tự động: <code>/tudong [SỐ_VỐN]</code>\nVí dụ: <code>/tudong 40000</code>")
     
     capital = int(parts[1])
     if capital < 1000:
@@ -1203,11 +1190,7 @@ def send_taokey(message):
     save_data()
     
     het = datetime.fromtimestamp(time.time() + n * 86400).strftime('%d/%m/%Y %H:%M:%S')
-    msg = f"✅ TẠO KEY VIP THÀNH CÔNG:
-🔑 <code>{key}</code>
-⏳ Thời hạn: {n} NGÀY
-📅 Hết hạn: {het}
-📊 TỔNG KEY CHƯA DÙNG: {len(valid_keys)}"
+    msg = f"✅ TẠO KEY VIP THÀNH CÔNG:\n🔑 <code>{key}</code>\n⏳ Thời hạn: {n} NGÀY\n📅 Hết hạn: {het}\n📊 TỔNG KEY CHƯA DÙNG: {len(valid_keys)}"
     bot.reply_to(message, msg)
 
 @bot.message_handler(commands=['danhsachkey'])
@@ -1218,10 +1201,7 @@ def send_danhsachkey(message):
         return bot.reply_to(message, '📭 Danh sách key kho trống')
         
     lines = [f"<code>{k}</code> → {v} NGÀY" for k, v in valid_keys.items()]
-    msg = "
-".join(lines) + f"
-
-📊 TỔNG CỘNG KHỎ: {len(valid_keys)} KEY VIP"
+    msg = "\n".join(lines) + f"\n\n📊 TỔNG CỘNG KHỎ: {len(valid_keys)} KEY VIP"
     bot.reply_to(message, msg)
 
 @bot.message_handler(commands=['nhapkey'])
@@ -1238,8 +1218,7 @@ def send_nhapkey(message):
         save_data()
         bot.reply_to(message, f"🎉 KÍCH HOẠT THÀNH CÔNG GÓI VIP {d} NGÀY ✅")
     else:
-        bot.reply_to(message, f"❌ KEY KHÔNG HỢP LỆ HOẶC ĐÃ ĐƯỢC SỬ DỤNG
-📩 MUA TẠI: {ADMIN_USERNAME}")
+        bot.reply_to(message, f"❌ KEY KHÔNG HỢP LỆ HOẶC ĐÃ ĐƯỢC SỬ DỤNG\n📩 MUA TẠI: {ADMIN_USERNAME}")
 
 @bot.message_handler(commands=['thongtin'])
 def send_thongtin(message):
@@ -1285,10 +1264,7 @@ def send_lichsucau(message):
     t = ls.count('TÀI')
     x = ls.count('XỈU')
     icons = "".join(['🔵' if i == 'TÀI' else '🔴' for i in ls])
-    msg = f"📊 THỐNG KÊ 20 PHIÊN GẦN NHẤT:
-🔵 TÀI: {t} | 🔴 XỈU: {x}
-
-{icons}"
+    msg = f"📊 THỐNG KÊ 20 PHIÊN GẦN NHẤT:\n🔵 TÀI: {t} | 🔴 XỈU: {x}\n\n{icons}"
     bot.reply_to(message, msg)
 
 @bot.message_handler(commands=['login'])
@@ -1308,9 +1284,7 @@ def send_login(message):
         
     init_user_state(message.chat.id)
     user_states[message.chat.id]['balance'] = r['money']
-    msg_success = f"✅ ĐĂNG NHẬP THÀNH CÔNG
-👤 NICKNAME: {r['nickname']}
-💰 SỐ DƯ: {r['money']:,} WIN"
+    msg_success = f"✅ ĐĂNG NHẬP THÀNH CÔNG\n👤 NICKNAME: {r['nickname']}\n💰 SỐ DƯ: {r['money']:,} WIN"
     bot.edit_message_text(msg_success, chat_id=m.chat.id, message_id=m.message_id)
     start_websocket(message.chat.id, r['token'])
 
@@ -1336,11 +1310,7 @@ def send_autobet(message):
         st['base_bet'] = amt
         st['bet_amount'] = amt
         x2_str = "💥 BẬT (khi bật /x2 on)" if st.get('x2_enabled') else "🔴 TẮT (dùng /x2 on để bật)"
-        msg = f"🟢 AUTO CƯỢC VI LONG ELITE ĐÃ BẬT VIP
-💰 VỐN KHỞI ĐIỂM: {amt:,} WIN
-🎲 GẤP THẾP X2: {x2_str}
-📊 ĐANG THU THẬP VÀ THEO DÕI LÃI LỖ
-(Dùng /autobet off hoặc /stop để dừng lại)"
+        msg = f"🟢 AUTO CƯỢC VI LONG ELITE ĐÃ BẬT VIP\n💰 VỐN KHỞI ĐIỂM: {amt:,} WIN\n🎲 GẤP THẾP X2: {x2_str}\n📊 ĐANG THU THẬP VÀ THEO DÕI LÃI LỖ\n(Dùng /autobet off hoặc /stop để dừng lại)"
         bot.reply_to(message, msg)
     else:
         st['auto_bet_enabled'] = False
