@@ -1,14 +1,7 @@
 services:
   - type: web
-    name: cc3-autopost
+    name: telegram-auto-post
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --workers 1 --threads 4 --timeout 120 --bind 0.0.0.0:$PORT
-    envVars:
-      - key: ADMIN_PASSWORD
-        sync: false
-      - key: SESSION_STRING
-        sync: false
-      - key: CONFIG_JSON
-        sync: false
+    startCommand: gunicorn app:app
