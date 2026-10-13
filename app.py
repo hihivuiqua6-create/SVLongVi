@@ -29,7 +29,14 @@ def log(m):
 loop = asyncio.new_event_loop()
 threading.Thread(target=lambda: (asyncio.set_event_loop(loop), loop.run_forever()), daemon=True).start()
 def run(coro, timeout=180):
-    return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout)
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    try:
+        return future.result(timeout)
+    except Exception as e:
+        # Do not leave a timed-out Telegram operation running in the event loop.
+        if isinstance(e, TimeoutError):
+            future.cancel()
+        raise
 
 # ---------- config ----------
 def normalize(d):
@@ -85,18 +92,54 @@ async def restore_cloud():
 
 # ---------- telegram ----------
 async def connect():
-    if state["client"]:
-        try: await state["client"].disconnect()
-        except Exception: pass
-    c = TelegramClient(StringSession(cfg.get("session_string") or ""), int(cfg["api_id"]), cfg["api_hash"],
-                       connection_retries=None, retry_delay=5, auto_reconnect=True, flood_sleep_threshold=60)
-    await c.connect(); state["client"] = c
-    if await c.is_user_authorized():
-        state["me"] = await c.get_me(); return True
-    return False
+    # Validate configuration early so the page can report a useful error.
+    try:
+        api_id = int(str(cfg.get("api_id", "")).strip())
+    except (TypeError, ValueError):
+        raise ValueError("API ID chưa hợp lệ. Hãy nhập API ID dạng số trong config.json.")
+    api_hash = str(cfg.get("api_hash", "")).strip()
+    phone = str(cfg.get("phone", "")).strip()
+    if not api_hash or not phone:
+        raise ValueError("Thiếu API Hash hoặc số điện thoại trong config.json.")
+
+    old = state.get("client")
+    state["client"] = None
+    state["me"] = None
+    if old:
+        try:
+            await asyncio.wait_for(old.disconnect(), timeout=5)
+        except Exception:
+            pass
+    c = TelegramClient(
+        StringSession(cfg.get("session_string") or ""), api_id, api_hash,
+        connection_retries=2, retry_delay=1, auto_reconnect=False,
+        request_retries=2, timeout=12, flood_sleep_threshold=60
+    )
+    try:
+        await asyncio.wait_for(c.connect(), timeout=25)
+        state["client"] = c
+        if await asyncio.wait_for(c.is_user_authorized(), timeout=10):
+            state["me"] = await asyncio.wait_for(c.get_me(), timeout=10)
+            return True
+        return False
+    except Exception:
+        try:
+            await asyncio.wait_for(c.disconnect(), timeout=3)
+        except Exception:
+            pass
+        if state.get("client") is c:
+            state["client"] = None
+        raise
 
 async def send_code():
-    r = await state["client"].send_code_request(cfg["phone"]); state["phone_hash"] = r.phone_code_hash
+    c = state.get("client")
+    if not c or not c.is_connected():
+        raise ConnectionError("Chưa kết nối được Telegram. Kiểm tra Logs và thử lại.")
+    phone = str(cfg.get("phone", "")).strip()
+    if not phone:
+        raise ValueError("Chưa nhập số điện thoại có mã quốc gia, ví dụ +84...")
+    r = await asyncio.wait_for(c.send_code_request(phone), timeout=35)
+    state["phone_hash"] = r.phone_code_hash
 
 async def finish_login(code=None, pw=None):
     c = state["client"]
@@ -227,7 +270,7 @@ label{font-size:13px;color:#9ca3af}</style></head><body><div class=c><h1>📢 CC
 <div class=b><h3>📁 Nhập file config.json</h3><form method=post action=/upload enctype=multipart/form-data>
 <input type=file name=file accept=.json><button>Tải lên</button></form>
 <a href=/download style=color:#2aabee>⬇ Tải config hiện tại</a>
-<form method=post action=/import-json><label>Dán toàn bộ nội dung config.json tại đây</label><textarea name=config_json rows=8 placeholder='{"api_id":"...","api_hash":"...","phone":"+84..."}'></textarea><button>📥 Nhập JSON cấu hình</button></form>
+<form method=post action=/import-json enctype=multipart/form-data><label>Chọn file config.json (khuyên dùng)</label><input type=file name=config_file accept=".json,application/json"><label>Hoặc dán toàn bộ nội dung JSON vào ô dưới</label><textarea name=config_json rows=8 placeholder='{"api_id":"...","api_hash":"...","phone":"+84..."}'></textarea><button>📥 Nhập JSON cấu hình</button></form>
 <p style="font-size:12px;color:#9ca3af">Có thể nhập API ID, API HASH, số điện thoại, SESSION STRING, ID nhóm/kênh, link bài đăng và các cài đặt khác trong cùng một file JSON.</p></div>
 <div class=b><h3>🔐 Đăng nhập Telegram</h3>
 {% if not me %}<form id=otpform method=post action=/login><button id=otpbtn type=submit>📨 Gửi mã OTP tới {{c.phone}}</button><span id=otpstatus role=status style="display:block;margin-top:8px;color:#9fe870"></span></form>
@@ -287,12 +330,30 @@ def upload():
 def import_json():
     global cfg
     try:
-        raw = request.form.get("config_json", "").strip()
-        d = json.loads(raw)
-        if not isinstance(d, dict): raise ValueError("JSON phải là một object")
+        # Ưu tiên file được chọn; nếu không có file thì đọc nội dung trong textarea.
+        uploaded = request.files.get("config_file")
+        if uploaded and uploaded.filename:
+            raw_bytes = uploaded.read()
+            if not raw_bytes or not raw_bytes.strip():
+                raise ValueError("File JSON rỗng. Hãy chọn đúng file config.json.")
+            try:
+                d = json.loads(raw_bytes.decode("utf-8-sig"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as e:
+                raise ValueError(f"File không phải JSON hợp lệ: {e}") from e
+        else:
+            raw = request.form.get("config_json", "").strip()
+            if not raw:
+                raise ValueError("Bạn chưa chọn file và ô JSON đang trống. Hãy chọn config.json hoặc dán nội dung JSON vào ô.")
+            try:
+                d = json.loads(raw.lstrip("\ufeff"))
+            except json.JSONDecodeError as e:
+                raise ValueError(f"JSON sai định dạng tại dòng {e.lineno}, cột {e.colno}: {e.msg}") from e
+        if not isinstance(d, dict):
+            raise ValueError("Nội dung JSON phải là object bắt đầu bằng { và kết thúc bằng }.")
         ss = cfg.get("session_string")
         new = normalize(d)
-        if not new.get("session_string"): new["session_string"] = ss
+        if not new.get("session_string"):
+            new["session_string"] = ss
         with lock:
             cfg = new
             save_local()
@@ -344,12 +405,14 @@ def login():
                 state["otp_status"] = "Tài khoản đã đăng nhập sẵn."
                 log("Đã đăng nhập sẵn")
             else:
-                state["otp_status"] = "Đang yêu cầu Telegram gửi mã OTP…"
-                run(send_code(), 90)
-                state["otp_status"] = "Đã yêu cầu gửi OTP. Kiểm tra Telegram (hoặc SMS nếu Telegram cung cấp)."
-                log("📨 Đã gửi yêu cầu mã OTP")
+                state["otp_status"] = "Đã kết nối. Đang yêu cầu Telegram gửi mã OTP…"
+                run(send_code(), 45)
+                state["otp_status"] = "Đã yêu cầu gửi OTP. Kiểm tra tin nhắn dịch vụ Telegram trong ứng dụng."
+                log("📨 Đã yêu cầu gửi OTP")
         except Exception as e:
             msg = str(e).strip() or type(e).__name__
+            if isinstance(e, TimeoutError):
+                msg = "Hết thời gian chờ Telegram phản hồi. Kiểm tra API ID/Hash, số điện thoại và Logs; thử lại sau."
             state["otp_status"] = "Gửi OTP thất bại: " + msg[:220]
             log(f"Login lỗi: {type(e).__name__}: {msg}")
         finally:
